@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 itertools = "0.9"
+crossterm = "0.26"
+
+[dev-dependencies]
 flamegraph = "0.6.5"
 
 [profile.release]

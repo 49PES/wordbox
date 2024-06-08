@@ -1,7 +1,13 @@
+use crossterm::{
+    cursor, execute,
+    style::{self, Stylize},
+    terminal::{self, BeginSynchronizedUpdate, EndSynchronizedUpdate},
+    ExecutableCommand,
+};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{stdout, BufRead, BufReader, Stdout, Write};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WordBox {
@@ -22,9 +28,9 @@ impl Display for WordBox {
 
         for row in &grid {
             for ch in row {
-                write!(f, "{} ", ch)?;
+                write!(f, "{}", ch)?;
             }
-            writeln!(f, "\n")?;
+            write!(f, "\n")?;
         }
 
         Ok(())
@@ -145,8 +151,17 @@ impl WordBox {
     }
 }
 
+fn print_clear(wb: &WordBox) {
+    execute!(
+        stdout(),
+        cursor::RestorePosition,
+        style::PrintStyledContent(wb.to_string().cyan().bold())
+    );
+}
+
 fn solve_word_box(wb: WordBox, vec_lexicon: &VecLexicon) -> Option<WordBox> {
-    println!("{}", wb);
+    execute!(stdout(), terminal::Clear(terminal::ClearType::All));
+    print_clear(&wb);
     if wb.is_done() {
         return Some(wb);
     }
@@ -161,7 +176,7 @@ fn solve_word_box(wb: WordBox, vec_lexicon: &VecLexicon) -> Option<WordBox> {
     None
 }
 fn main() {
-    let words = filter_words("../3esl.txt");
+    let words = filter_words("3esl.txt");
     let vec_lexicon = VecLexicon { words };
 
     let rows: Vec<String> = vec![];
