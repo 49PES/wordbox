@@ -176,13 +176,13 @@ fn solve_word_box(wb: WordBox, vec_lexicon: &VecLexicon) -> Option<WordBox> {
     None
 }
 fn main() {
-    let words = filter_words("3esl.txt");
+    let words = filter_words("../3esl.txt");
     let vec_lexicon = VecLexicon { words };
 
     let rows: Vec<String> = vec![];
     let word_box = WordBox {
-        row_dim: 6,
-        col_dim: 6,
+        row_dim: 5,
+        col_dim: 5,
         rows,
     };
 
