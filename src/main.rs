@@ -30,7 +30,7 @@ impl Display for WordBox {
             for ch in row {
                 write!(f, "{}", ch)?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
 
         Ok(())
@@ -38,10 +38,8 @@ impl Display for WordBox {
 }
 
 pub trait Lexicon {
-    // some constructor
     fn initialize(words: Vec<String>, lengths: Vec<usize>) -> Self;
 
-    // whatever methods you have
     fn words_with_prefix(&self, prefix: &String, word_len: usize) -> Vec<String>;
 }
 
@@ -118,28 +116,18 @@ impl WordBox {
             .collect()
     }
 
-    fn next_moves<L: Lexicon>(&self, vec_lexicon: &L) -> Vec<String> {
-        let mut moves = vec![];
+    fn is_valid_move<L: Lexicon>(&self, word: &String, vec_lexicon: &L) -> bool {
         let mut rows: Vec<String> = self.rows.clone();
-        for word in vec_lexicon.words_with_prefix(&"".to_string(), self.col_dim) {
-            rows.push(word.clone());
-            let mut flag: bool = true;
-            for i in 0..self.col_dim {
-                let prefix = Self::take_ith_characters(&rows, i);
-                let choice = vec_lexicon.words_with_prefix(&prefix, self.row_dim);
-                if choice.is_empty() {
-                    flag = false;
-                    break;
-                }
+        rows.push(word.clone());
+        for i in 0..self.col_dim {
+            let prefix = Self::take_ith_characters(&rows, i);
+            let choice = vec_lexicon.words_with_prefix(&prefix, self.row_dim);
+            if choice.is_empty() {
+                return false;
             }
-            if flag {
-                moves.push(word.clone());
-            }
-            rows.remove(rows.len() - 1);
         }
-        moves
+        true
     }
-
     fn add_word(&self, word: String) -> WordBox {
         let mut rows: Vec<String> = self.rows.clone();
         rows.push(word.clone());
@@ -165,10 +153,13 @@ fn solve_word_box(wb: WordBox, vec_lexicon: &VecLexicon) -> Option<WordBox> {
     if wb.is_done() {
         return Some(wb);
     }
-    let choices = wb.next_moves(vec_lexicon);
+    let choices = vec_lexicon
+        .words
+        .iter()
+        .filter(|word| wb.is_valid_move(word, vec_lexicon));
 
     for choice in choices {
-        let sol = solve_word_box(wb.add_word(choice), vec_lexicon);
+        let sol = solve_word_box(wb.add_word(choice.to_string()), vec_lexicon);
         if sol.is_some() {
             return sol;
         }
@@ -177,16 +168,18 @@ fn solve_word_box(wb: WordBox, vec_lexicon: &VecLexicon) -> Option<WordBox> {
 }
 fn main() {
     let words = filter_words("../3esl.txt");
-    let vec_lexicon = VecLexicon { words };
+    let row_dim = 6;
+    let col_dim = 6;
+
+    let vec_lexicon = VecLexicon::initialize(words, vec![row_dim, col_dim]);
 
     let rows: Vec<String> = vec![];
     let word_box = WordBox {
-        row_dim: 5,
-        col_dim: 5,
+        row_dim,
+        col_dim,
         rows,
     };
 
-    println!("{}", vec_lexicon.words.len());
     let word_box_option = solve_word_box(word_box, &vec_lexicon);
 
     match word_box_option {
