@@ -7,6 +7,8 @@ edition = "2021"
 rand = "0.8.5"
 itertools = "0.9"
 crossterm = "0.26"
+tqdm = "0.7.0"
+rayon = "1.10.0"
 
 [dev-dependencies]
 flamegraph = "0.6.5"
