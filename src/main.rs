@@ -91,8 +91,14 @@ impl Lexicon for HashMapLexicon {
         HashMapLexicon { words: words_map }
     }
 
-    fn words_with_prefix(&self, prefix: &String, _word_len: usize) -> Vec<String> {
-        self.words.get(prefix).map_or(vec![], |words| words.clone())
+    fn words_with_prefix(&self, prefix: &String, word_len: usize) -> Vec<String> {
+        self.words
+            .get(prefix)
+            .unwrap_or(&vec![])
+            .iter()
+            .filter(|w| w.len() == word_len)
+            .cloned()
+            .collect()
     }
 }
 
