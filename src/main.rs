@@ -1,13 +1,15 @@
 use crossterm::{
     cursor, execute,
     style::{self, Stylize},
-    terminal::{self, BeginSynchronizedUpdate, EndSynchronizedUpdate},
-    ExecutableCommand,
+    terminal::{self},
 };
+use rayon::prelude::*;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{stdout, BufRead, BufReader, Stdout, Write};
+use std::io::{stdout, BufRead, BufReader};
+use std::time::Instant;
 use std::{collections::HashMap, vec};
+use tqdm::tqdm;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WordBox {
@@ -40,7 +42,7 @@ impl Display for WordBox {
 pub trait Lexicon {
     fn initialize(words: Vec<String>, lengths: Vec<usize>) -> Self;
 
-    fn words_with_prefix(&self, prefix: &String, word_len: usize) -> Vec<String>;
+    fn words_with_prefix(&self, prefix: &str, word_len: usize) -> Vec<String>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +62,7 @@ impl Lexicon for VecLexicon {
         }
     }
 
-    fn words_with_prefix(&self, prefix: &String, word_len: usize) -> Vec<String> {
+    fn words_with_prefix(&self, prefix: &str, word_len: usize) -> Vec<String> {
         self.words
             .iter()
             .filter(|word| word.starts_with(prefix) && word.len() == word_len)
@@ -69,7 +71,7 @@ impl Lexicon for VecLexicon {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HashMapLexicon {
     words: HashMap<String, Vec<String>>,
 }
@@ -91,7 +93,7 @@ impl Lexicon for HashMapLexicon {
         HashMapLexicon { words: words_map }
     }
 
-    fn words_with_prefix(&self, prefix: &String, word_len: usize) -> Vec<String> {
+    fn words_with_prefix(&self, prefix: &str, word_len: usize) -> Vec<String> {
         self.words
             .get(prefix)
             .unwrap_or(&vec![])
@@ -134,9 +136,9 @@ impl WordBox {
             .collect()
     }
 
-    fn is_valid_move<L: Lexicon>(&self, word: &String, lexicon: &L) -> bool {
+    fn is_valid_move<L: Lexicon>(&self, word: &str, lexicon: &L) -> bool {
         let mut rows: Vec<String> = self.rows.clone();
-        rows.push(word.clone());
+        rows.push(word.to_string());
         for i in 0..self.col_dim {
             let prefix = Self::take_ith_characters(&rows, i);
             let choice = lexicon.words_with_prefix(&prefix, self.row_dim);
@@ -167,12 +169,12 @@ fn print_clear(wb: &WordBox) {
 }
 
 fn solve_word_box<L: Lexicon>(wb: WordBox, lexicon: &L) -> Option<WordBox> {
-    execute!(stdout(), terminal::Clear(terminal::ClearType::All));
-    print_clear(&wb);
+    // execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok()?;
+    // print_clear(&wb);
     if wb.is_done() {
         return Some(wb);
     }
-    let binding = lexicon.words_with_prefix(&"".to_string(), wb.col_dim);
+    let binding = lexicon.words_with_prefix("", wb.col_dim);
 
     let choices = binding
         .iter()
@@ -187,24 +189,33 @@ fn solve_word_box<L: Lexicon>(wb: WordBox, lexicon: &L) -> Option<WordBox> {
     None
 }
 fn main() {
+    let start = Instant::now();
     let words = filter_words("../3esl.txt");
 
+    // Find all word boxes of row_dim x col_dim
     let row_dim = 6;
     let col_dim = 6;
 
     let lexicon = HashMapLexicon::initialize(words, vec![row_dim, col_dim]);
 
-    let rows: Vec<String> = vec![];
-    let word_box = WordBox {
-        row_dim,
-        col_dim,
-        rows,
-    };
+    lexicon
+        .words_with_prefix("", col_dim)
+        .par_iter()
+        .for_each(|word| {
+            let word_box_option = solve_word_box(
+                WordBox {
+                    row_dim,
+                    col_dim,
+                    rows: vec![word.to_string()],
+                },
+                &lexicon,
+            );
 
-    let word_box_option = solve_word_box(word_box, &lexicon);
-
-    match word_box_option {
-        Some(word_box) => println!("{}", word_box),
-        None => println!("No word box found.\n"),
-    }
+            match word_box_option {
+                Some(word_box) => println!("{}", word_box),
+                None => print!(""),
+            }
+        });
+    let duration = start.elapsed();
+    println!("Time Duration: {:?}", duration);
 }
