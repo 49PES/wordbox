@@ -4,6 +4,8 @@ use crossterm::{
     terminal::{self},
 };
 use rayon::prelude::*;
+use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{stdout, BufRead, BufReader};
@@ -36,6 +38,12 @@ impl Display for WordBox {
         }
 
         Ok(())
+    }
+}
+
+impl Ord for WordBox {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.score().cmp(&other.score())
     }
 }
 
@@ -125,6 +133,17 @@ fn filter_words(filename: &str) -> Vec<String> {
 }
 
 impl WordBox {
+    fn score(&self) -> f64 {
+        let mut prod = 1.0;
+        for i in 0..self.col_dim {
+            let prefix = Self::take_ith_characters(&self.rows, i);
+            let choices = lexicon.words_with_prefix(&prefix, self.row_dim);
+            prod *= choices.len() as f64;
+        }
+
+        (100 * self.rows.len()) as f64 + prod
+    }
+
     fn is_done(&self) -> bool {
         self.rows.len() == self.row_dim
     }
@@ -141,8 +160,8 @@ impl WordBox {
         rows.push(word.to_string());
         for i in 0..self.col_dim {
             let prefix = Self::take_ith_characters(&rows, i);
-            let choice = lexicon.words_with_prefix(&prefix, self.row_dim);
-            if choice.is_empty() {
+            let choices = lexicon.words_with_prefix(&prefix, self.row_dim);
+            if choices.is_empty() {
                 return false;
             }
         }
@@ -169,21 +188,21 @@ fn print_clear(wb: &WordBox) {
 }
 
 fn solve_word_box<L: Lexicon>(wb: WordBox, lexicon: &L) -> Option<WordBox> {
-    // execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok()?;
-    // print_clear(&wb);
-    if wb.is_done() {
-        return Some(wb);
-    }
-    let binding = lexicon.words_with_prefix("", wb.col_dim);
+    let mut boxes: BTreeMap<WordBox> = BTreeMap::from([wb]);
+    while !boxes.is_empty() {
+        let wb = boxes.pop_front().unwrap();
+        // execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok();
+        // print_clear(&wb);
+        if wb.is_done() {
+            return Some(wb);
+        }
+        let binding = lexicon.words_with_prefix("", wb.col_dim);
+        let choices = binding
+            .iter()
+            .filter(|word| wb.is_valid_move(word, lexicon));
 
-    let choices = binding
-        .iter()
-        .filter(|word| wb.is_valid_move(word, lexicon));
-
-    for choice in choices {
-        let sol = solve_word_box(wb.add_word(choice.to_string()), lexicon);
-        if sol.is_some() {
-            return sol;
+        for choice in choices {
+            boxes.push_front(wb.add_word(choice.to_string()));
         }
     }
     None
@@ -200,7 +219,7 @@ fn main() {
 
     lexicon
         .words_with_prefix("", col_dim)
-        .par_iter()
+        .iter()
         .for_each(|word| {
             let word_box_option = solve_word_box(
                 WordBox {
@@ -212,10 +231,15 @@ fn main() {
             );
 
             match word_box_option {
-                Some(word_box) => println!("{}", word_box),
+                Some(word_box) => {
+                    execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok();
+                    // print_clear(&word_box);
+                    println!("{}", word_box);
+                }
                 None => print!(""),
             }
         });
     let duration = start.elapsed();
+
     println!("Time Duration: {:?}", duration);
 }
