@@ -240,6 +240,5 @@ fn main() {
             }
         });
     let duration = start.elapsed();
-
     println!("Time Duration: {:?}", duration);
 }
