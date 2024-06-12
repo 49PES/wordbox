@@ -17,7 +17,9 @@ use tqdm::tqdm;
 pub struct WordBox {
     row_dim: usize,    // number of rows
     col_dim: usize,    // number of columns
-    rows: Vec<String>, // the words for each ROW
+    rows: Vec<String>, // the words for each row
+    cols: Vec<String>, // the words for each column
+    is_symmetric: bool,
 }
 
 impl Display for WordBox {
@@ -27,6 +29,12 @@ impl Display for WordBox {
         for (i, word) in self.rows.iter().enumerate() {
             for (j, ch) in word.chars().enumerate() {
                 grid[i][j] = ch;
+            }
+        }
+
+        for (i, word) in self.cols.iter().enumerate() {
+            for (j, ch) in word.chars().enumerate() {
+                grid[j][i] = ch;
             }
         }
 
@@ -40,13 +48,14 @@ impl Display for WordBox {
         Ok(())
     }
 }
-
+/*
 impl Ord for WordBox {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.score().cmp(&other.score())
+        // self.score().cmp(&other.score())
+        unimplemented!()
     }
 }
-
+*/
 pub trait Lexicon {
     fn initialize(words: Vec<String>, lengths: Vec<usize>) -> Self;
 
@@ -133,6 +142,7 @@ fn filter_words(filename: &str) -> Vec<String> {
 }
 
 impl WordBox {
+    /*
     fn score(&self) -> f64 {
         let mut prod = 1.0;
         for i in 0..self.col_dim {
@@ -143,6 +153,7 @@ impl WordBox {
 
         (100 * self.rows.len()) as f64 + prod
     }
+    */
 
     fn is_done(&self) -> bool {
         self.rows.len() == self.row_dim
@@ -171,10 +182,16 @@ impl WordBox {
     fn add_word(&self, word: String) -> WordBox {
         let mut rows: Vec<String> = self.rows.clone();
         rows.push(word.clone());
+        let mut cols = self.cols.clone();
+        if self.is_symmetric {
+            cols.push(word.clone());
+        }
         WordBox {
             row_dim: self.row_dim,
             col_dim: self.col_dim,
             rows,
+            cols,
+            is_symmetric: self.is_symmetric,
         }
     }
 }
@@ -188,7 +205,7 @@ fn print_clear(wb: &WordBox) {
 }
 
 fn solve_word_box<L: Lexicon>(wb: WordBox, lexicon: &L) -> Option<WordBox> {
-    let mut boxes: BTreeMap<WordBox> = BTreeMap::from([wb]);
+    let mut boxes: VecDeque<WordBox> = VecDeque::from([wb]);
     while !boxes.is_empty() {
         let wb = boxes.pop_front().unwrap();
         // execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok();
@@ -196,7 +213,9 @@ fn solve_word_box<L: Lexicon>(wb: WordBox, lexicon: &L) -> Option<WordBox> {
         if wb.is_done() {
             return Some(wb);
         }
-        let binding = lexicon.words_with_prefix("", wb.col_dim);
+
+        let prefix = WordBox::take_ith_characters(&wb.cols, wb.rows.len());
+        let binding = lexicon.words_with_prefix(&prefix, wb.col_dim);
         let choices = binding
             .iter()
             .filter(|word| wb.is_valid_move(word, lexicon));
@@ -226,6 +245,8 @@ fn main() {
                     row_dim,
                     col_dim,
                     rows: vec![word.to_string()],
+                    cols: vec![word.to_string()],
+                    is_symmetric: true,
                 },
                 &lexicon,
             );
@@ -233,10 +254,10 @@ fn main() {
             match word_box_option {
                 Some(word_box) => {
                     execute!(stdout(), terminal::Clear(terminal::ClearType::All)).ok();
-                    // print_clear(&word_box);
-                    println!("{}", word_box);
+                    print_clear(&word_box);
+                    // println!("{}", word_box);
                 }
-                None => print!(""),
+                None => (),
             }
         });
     let duration = start.elapsed();
